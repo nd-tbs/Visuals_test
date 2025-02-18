@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Count Per Fiscal Year</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        canvas {
+            max-width: 90%;
+            height: 600px;
+            margin: auto;
+        }
+        select {
+            margin-bottom: 20px;
+            padding: 5px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Top 30 Departments by Total Services</h2>
+    <label for="fiscalYear">Select Fiscal Year:</label>
+    <select id="fiscalYear" onchange="updateChart()"></select>
+    <canvas id="serviceChart"></canvas>
+
+    <script>
+        const csvUrl = "https://raw.githubusercontent.com/gcperformance/service-data/be2f4411a15d082a528f226a456957dc693f6313/outputs/si.csv";
+        let dataByYear = {};
+        
+        function loadData() {
+            Papa.parse(csvUrl, {
+                download: true,
+                header: true,
+                complete: function(results) {
+                    processCSVData(results.data);
+                }
+            });
+        }
+        
+        function processCSVData(data) {
+            dataByYear = {};
+            data.forEach(row => {
+                let year = row["fiscal_yr"];
+                let department = row["department_en"];
+                if (!year || !department) return;
+                
+                if (!dataByYear[year]) {
+                    dataByYear[year] = {};
+                }
+                
+                dataByYear[year][department] = (dataByYear[year][department] || 0) + 1;
+            });
+            
+            populateDropdown();
+            updateChart();
+        }
+        
+        function populateDropdown() {
+            let select = document.getElementById("fiscalYear");
+            select.innerHTML = "";
+            Object.keys(dataByYear).sort().reverse().forEach(year => {
+                let option = document.createElement("option");
+                option.value = year;
+                option.textContent = year;
+                select.appendChild(option);
+            });
+        }
+        
+        let ctx = document.getElementById("serviceChart").getContext("2d");
+        let chart;
+        
+        function updateChart() {
+            let selectedYear = document.getElementById("fiscalYear").value;
+            let data = dataByYear[selectedYear] || {};
+            let sortedDepartments = Object.entries(data)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 30);
+            
+            let labels = sortedDepartments.map(item => item[0]);
+            let values = sortedDepartments.map(item => item[1]);
+            
+            if (chart) {
+                chart.destroy();
+            }
+            
+            chart = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: "Total Services",
+                        data: values,
+                        backgroundColor: "steelblue"
+                    }]
+                },
+                options: {
+                    indexAxis: "y",
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: "Top 30 Departments by Total Services"
+                        }
+                    },
+                    scales: {
+                        x: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+        
+        document.addEventListener("DOMContentLoaded", loadData);
+    </script>
+</body>
+</html>
